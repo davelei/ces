@@ -1,0 +1,808 @@
+nginx官网：nginx.org
+
+
+yum list|grep gcc
+
+iptables 规则
+iptables -L   #查看
+iptables -L   #关闭
+iptables -t nat -L   #查看
+iptables -t nat -F   #关闭
+
+selinux  停用
+getenforce			#查看
+setenforce 0		#关闭
+
+安装yum
+yum  -y install gcc gcc-c++ autoconf pcre pcre-devel make automake
+yum  -y install wget httpd-tools vim
+
+安装nginx
+
+vim /etc/yum.repos.d/nginx.repo
+[nginx]
+name=nginx repo
+baseurl=http://nginx.org/packages/centos/7/$basearch/
+gpgcheck=0
+enabled=1
+
+安装列表
+yum list |grep nginx
+安装
+yum install nginx
+查看
+ng 
+nginx -v  #查看版本
+nginx -V  #编译参数
+
+rpm -ql nginx #安装目录查看
+/etc/logrotate.d/nginx   #    作用：
+						Nginx日志轮转，用于logrotate服务
+						的日志切割
+
+--with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-cc-opt='-O2 -g -pipe -
+
+
+讲解：
+运用场景：查看客户端状态
+--with-http_stub_status_module  #Nginx的客户端状态
+配置语法：
+Syntax:stub_status;
+Default:-（默认没有配置）
+Context:server，location
+添加位置在default.conf
+新增：location /mystatus {
+	stub_status;
+	}
+	
+访问：http://ip/mystatus  查看
+
+运用场景：给客户展示不同的页面
+--with-http_random_index_module # 目录中选择一个随机主页
+配置语法：
+Syntax:random_index on|off;
+Default:random_index off 
+Context:location
+添加位置在default.conf
+修改： location / {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+    }
+为 location / {
+	    root /opt/app/code;#存放html的目录
+        random_index on;
+		# root   /usr/share/nginx/html;
+		#index  index.html index.htm;
+    }
+访问：http://ip/  查看   可随机出现不同的页面
+
+运用场景：
+--with-http_sub_module	#HTTP内容替换  多个虚拟
+第一种语法
+Syntax:sub_filter string(要替换的内容) replacement(要替换后的对象);
+Default:-
+Context:http,server,location     #层级
+第二种语法  主要作用是用于缓存
+Syntax:sub_filter_last_modified(http的头信息last_modified) on|off;
+Default:sub_filter_last_modified off;
+Context:http,server,location  #层级
+第三种语法
+Syntax:sub_filter_once on|off;
+Default:sub_filter_once off;
+Context:http,server,location  #层级
+
+
+Nginx的请求限制
+
+
+HTTP请求建立在一次TCP连接基础上
+一次TCP请求至少产生一次HTTP请求
+连接限制
+连接频率限制-limit_conn_module
+Syntax:limit_conn_zone key zone=name:size;  #申请空间zone  size 是指空间大小比如1M
+Default:-
+Context:http
+
+Syntax:limit_conn zone number;  #zone是指申请空间的名字  number是指并发的数量
+Default:-
+Context:http,server,location
+
+请求限制
+请求频率限制-limit_req_module
+Syntax:limit_req_zone key zone=name:size rate=rate;  #申请空间zone  size 是指空间大小比如1M  rate=1r/s
+Default:-
+Context:http
+
+Syntax:limit_req zone=named [burst=number][nodelay];  #zone是指申请空间的名字  number是指并发的数量
+Default:-
+Context:http,server,location
+
+
+
+
+ab工具访问
+ab -n 30 -c 20 http://192.168.122.1/1.html
+
+
+Nginx 访问控制
+基于IP的访问控制-http_access_module
+语法：
+Syntax:allow address(ip)|CIDP(网段)|unix(socket访问方式 一般不常用):|all(允许所有的)
+Default:-
+Context:http,server,location,limit_except
+
+Syntax:deny address(ip)|CIDP(网段)|unix(socket访问方式 一般不常用):|all(允许所有的)
+Default:-
+Context:http,server,location,limit_except
+
+
+http_access_module局限性决解方法
+方法一、采用别的HTTP头信息访问控制，如：http_x_forwarded_for
+http_x_forwarded_for=Client IP,Proxy(1)IP.Proxy(2)IP,...
+方法二、结合geo模块作
+方法三、通过HTTP自定义变量传递
+
+基于用户的信任登录-http_auth_basic_module
+语法：
+Syntax:auth_basic string|off;
+Default:auth_basic off;
+Context:http,server,location,limit_except
+
+Syntax:auth_basic_user_file file(密码文件名称 参考路径：http://nginx.org/en/docs/http/ngx_http_auth_basic_module.html);
+Default:-
+Context:http,server,location,limit_except
+
+密码文件工具：htpasswd
+rpm -qf /usr/bin/htpasswd
+yum install httpd-tools -y
+生产密码文件
+htpasswd  -c ./file(文件名)  用户名    输入密码  确认密码
+
+http_auth_basic_module局限性
+一、用户信息依赖文件方式
+二、操作管理机械，效率低下
+解决方案
+一、Nginx结合LUA实现高效验证
+二、Nginx和LDAP(LDAP是轻量目录访问协议)打通，利用niginx-auth-ldap模块
+
+重启nginx服务
+systemctl restart nginx.service
+或
+systemctl reload nginx.service
+
+浏览器
+curl -v http://www.imooc.com
+
+
+Nginx日志类型
+包含：error.log  access.log
+
+log_format
+Sybtax: log_format name[escape=default[json] string ...];
+Default: log_format combined "...";
+Context:http
+
+
+../etc/nginx/conf.d/default.conf
+User-Agent
+修改 nginx.conf 
+检查配置文件
+nginx -t -c /../../../nginx.conf
+nginx -t -c  /etc/nginx/nginx.conf
+重载服务
+nginx -s reload -c /../../../nginx.conf
+
+nginx -s reload -c /etc/nginx/nginx.conf
+
+问题：nginx: [error] invalid PID number "" in "/var/run/nginx.pid"
+解决：sudo nginx -c /etc/nginx/nginx.conf
+	  sudo nginx -s reload
+ps -aux|grep nginx
+
+
+常见Nginx中间框架
+一、静态资源WEB服务
+二、代理服务
+三、负载均衡调度器SLB
+四、动态缓存
+
+静态资源类型
+静态资源服务场景-CDN  分发网络作用
+相当于 将资源放到不同代理服务端(Nginx)
+    DNS
+		请求	Nginx(比如北京)		回源
+User	请求	Nginx(比如湖南)     回源        Nginx(资源存储中心)
+		请求	Nbinx(比如山东)		回源
+
+配置语法-文件读取
+Syntax:sendfile on|off;
+Default:sendfile off;
+Context:http,server,location,if in location
+
+	引读：-with-file-aio异步文件读取
+
+配置语法-tcp_nopush
+Syntax:tcp_nopush on|off;
+Default:tcp_nopush off;
+Context:http,server,location
+
+	作用：sendfile开启的情况下，提高网络包的传输效率
+配置语法-tcp_nodelay
+Syntax:tcp_nodelay on|off;
+Default:tcp_nodelay off;
+Context:http,server,location
+	
+	作用：keepalive连接下，提高网络包的传输实时性
+	
+配置语法-压缩
+Syntax:gzip on|off;
+Default:gzip off;
+Context:http,server,location
+
+	作用：压缩传输
+	
+	(解压)								(压缩)
+	浏览器								Nginx
+(压缩比语法如下：)
+Syntax:gzip_comp_level level;
+Default:gzip_comp_level 1;
+Context:http,server,location
+
+(gzip版本)
+Syntax:gzip_http_version 1.0|1.1;
+Default:gzip_http_version 1.1;
+Context:http,server,location
+
+扩展Nginx压缩模块
+http_gzip_static_module -预读gzip功能(文件已压缩)
+http_gunzip_module -应用支持gunzip的压缩方式
+
+
+
+问题一：nginx 读取文件 permission denied
+决解方案：
+在nginx.conf文件头中加入user root(我是用root用户启动的)
+停止nginx -s stop
+重启nginx -c  nginx.conf
+
+问题二：nginx gzip 压缩图片失效
+
+
+
+浏览器缓存设置
+配置语法 - expires
+	添加Cache-Control、Expires头
+	Syntax:expires[modified]time;
+			expires epoch|max|off;
+	Default:expires off;
+	Context:http,server,locatiuon,if in location
+	
+跨域访问	
+	为什么浏览器禁止跨域访问
+	 不安全，容易出现csrf攻击！
+	 
+ Nginx决解方案
+	Syntax:add_header name value[always];
+	Default:-
+	Context:http,server,location,if in location
+	
+	
+	Access-Control-Allow-Origin
+	
+	例如：
+	 location ~ .*\.(htm|html)$ {
+        add_header Access-Control-Allow-Origin *; 
+        add_header Access-Control-Allow-Methods GET,POST,PUT,DELETE,OPTIONS;
+        root  /opt/app/code;
+    }
+
+防盗链
+	目的；防止资源被盗用
+	
+	设置思路
+		首要方式：区别那些请求是非正常的用户请求
+		
+基于http_refer	防盗链配置模板
+
+	Syntax:valid_referers none|blocked|server_names|string...;
+	Default:-
+	Context:server,location
+	
+	
+Nginx代理服务
+	正向代理
+	如翻墙
+	
+	反向代理
+	
+	代理区别
+		区别在于代理的对象不一样
+		
+		正向代理代理的对象是客户端
+		反向代理代理的对象是服务端
+		
+		
+配置语法
+	Syntax:proxy_pass URL;
+	Default:-
+	Context:location,if in location,limit_except
+	
+	http://localhost:8000/uri/
+	https://192.168.122.1/uri/
+	http://unix:/tmp/backend.socket:/uri/;
+	
+其他配置语法-缓冲区
+	Syntax:proxy_buffering on|off;
+	Default:proxy_buffering on;
+	Context:http,server,location
+	
+	扩展:proxy_buffer_size、proxy_buffers、proxy_busy_buffers_size
+	
+	
+其他配置语法-跳转重定向(http:301地址重写)
+	Syntax:proxy_redirect default;
+	proxy_redirect off;proxy_redirect redirect replacement;
+	Default:proxy_redirect default;
+	Context:http,server,location
+	
+	
+其他配置语法-头信息
+	Syntax:proxy_set_header field value;
+	Default:proxy_set_header Host $proxy_host;
+			proxy_set_header Connection close;
+	Context:http,server,location
+	
+	扩展:proxy_hide_header、proxy_set_body
+	
+	
+其他配置语法-超时
+	Syntax:proxy_connect_timeout time;
+	Default:proxy_connect_timeout 60s;
+	Context:http,server,location
+	
+	扩展:proxy_read_timeout、proxy_send_timeout
+	
+Nginx负载均衡
+	基于LVS的中间件架构
+	
+	地域：：：
+	GSLB全局负载均衡(可根据省市部署节点)
+	包括：调度中心节点		调度节点
+		应用服务中心节点			应用服务
+		
+	SLB
+	包括：用户节点   调度节点   服务节点
+	
+	网络：：：
+	分为四层负载均衡和七层负载均衡
+	
+	四层负载均衡(传输层) 作用是报文的转发
+	
+	七层负载均衡(应用层) 作用是应用逻辑的处理
+	
+	Nginx是七层负载均衡
+	
+Nginx利用proxy_pass(代理)转发到不同的upstream server
+
+	配置语法
+	Syntax:upstream name {...}
+	Default:-
+	Context:http
+	
+	upstream 举例
+		upstream backend{
+			server backend1.example.com				weight=5;
+			server backend2.example.com:8080;
+			server unix:/tmp/backend3;
+			
+			server backup1.example.com:8080 backup;
+			server backup2.example.com:8080 backup;
+		}
+		
+		后端服务器在负载均衡调度中的状态
+			down					当前的server暂时不参与负载均衡
+			backup					预留的备份服务器
+			max_fails				允许请求失败的次数
+			fail_timeout			经过max_fail失败后，服务暂停的时间
+			max_conns				限制最大的接收的连接数
+			
+调度算法
+	轮询				按时间顺序逐一分配到不同的后端服务器
+	加权轮询			weight值越大，分配到的访问机率越高
+	ip_hash   			每个请求按访问IP的hash结果来分配请求，是每个url定向到同一个后端服务器
+	url_hash			按照访问的url的hash结果来分配请求，是每个url定向到同一个后端服务器
+	least_hash 			最少连接数，那个机器连接数少就分发
+	hash关键数值		hash自定义的key
+	
+	
+url_hash
+	Syntax:hash key[consistent];
+	Default:-
+	Context:upstream
+	This direction appeared in version 1.7.2
+	
+	
+缓存服务
+	Nginx代理缓存
+	proxy_cache配置语法
+	
+	Syntax:proxy_cache_path path[levels=levels]
+	[use_temp_path=on|off]keys_zone=name:size[inactive=time]
+	[max_size=size][manager_files=number][manager_sleep=time]
+	[manager_threshold=time][loader_files=number]
+	[loader_sleep=time][load_threshold=time][purger=on|off]
+	[purger_files=number][purger_sleep=time]
+	[purgger_threshold=time];
+	Default:-
+	Context:http
+
+		
+	Syntax:proxy_cache zone(名字)|off;
+	Default:proxy_cache off;
+	Context:http,server,location
+
+配置语法-缓存过去周期	
+	Syntax:proxy_cache_valid[code(返回状态码)...]time;
+	Default:-
+	Context:http,server,location
+		
+配置语法-缓存的维度	
+	Syntax:proxy_cache_key string;
+	Default:proxy_cache_key $scheme$proxy_host$request_uil;
+	Context:http,server,location
+	
+	
+配置语法-让部分页面不缓存	
+	Syntax:proxy_no_cache_key string...;
+	Default:-
+	Context:http,server,location
+	
+大文件分片请求
+	Syntax:slice size;
+	Default:slice 0;
+	Context:http,server,location
+	
+	
+	深度学习篇
+一、动静分离
+		通过中间件将动态请求和静态请求分离。
+		
+		分离资源，减少不必要的请求消耗，减少请求延时。
+	
+	
+二、Nginx的rewrite规则
+	实现url重写以及重定向
+	2场景
+		1)url访问跳转，支持开发设计
+			页面跳转、兼容性支付、展示效果等
+			
+		2)SEO优化
+		3)维护
+			后台维护、流量转发等
+		4)安全
+	配置语法
+	Syntax:rewrite regex(正则表达式) replacement [flag];
+	Default:-
+	Context:server,location,if
+	
+	比如:rewrite ^(.*)$/pages/maintain.html break;
+	
+	flag包括:break  	停止rewrite检测
+			last    	停止rewrite检测
+			redirect 	返回302临时重定向，地址栏会显示跳转后的地址
+			permanent	返回301永久重定向，地址栏会显示跳转后的地址
+			
+			break与last的区别在于last会重新建立一个请求连接
+			redirect与last的区别在于redirect会先302然后再跳转2次请求  last之请求一次
+			
+		rewrite规则优先级
+			执行server块的rewrite指令
+			执行location匹配
+			执行选定的location中的rewrite
+			
+Nginx高级模块
+	安全连接模块:secure_link_module模块
+	一、制定并允许检查请求的连接的真实性以及保护资源免遭未经授权的访问
+	二、限制连接生效周期
+	
+	secure_link_module配置语法
+	Syntax:secure_link expression;
+	Default:-
+	Context:http,server,location
+	
+	Syntax:secure_link_md5 expression;
+	Default:-
+	Context:http,server,location
+	主要是md5加密验证
+	
+	
+	地域信息读取模块:geoip_module模块
+	
+	基于IP地址匹配MaxMind GeoIP二进制文件，读取IP所在地域信息
+	yum install nginx-module-geoip  安装
+	
+	使用场景
+	一、区别国内外HTTP访问规则
+	二、区别国内城市地域HTTP访问规则
+	
+	在nginx.conf 文件添加
+	load_module "module/ngx_http_geoip_module.so"
+	load_module "module/ngx_stream_geoip_module.so";
+	
+	
+	国家、城市文件的下载
+	shell脚本：
+	#!/bin/sh
+	wget http://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz
+	wget http://geolite.maxmind.com/download/geoip/database/GeoliteCity.dat.gz
+	
+四 HTTPS服务
+	客户端       发起ssl连接        									服务端(保管唯一私钥服务端)
+				 发送公钥(给客户端)
+				 发送对称密码(发送对称密码利用公钥加密  发送都服务端)
+				 利用对称秘钥传输数据(双方)
+	
+	防止中间人伪造客户端和服务端使用CA签名证书(是由服务端发起的)
+		客户端对数字证书进行CA校验
+			1.如果校验成功则利用公钥加密
+			2.如果校验失败则停止会话
+	
+	怎么生产CA证书
+		生成密钥和CA证书
+		服务上:#openssl version(证书生产的安装包之一)
+				#nginx -V 
+				 查看是否有  --with-http_ssl_module
+				 
+		 步骤一、生产key密钥
+		 步骤二、生产证书签名请求文件(csr文件)
+		 步骤三、生产证书签名文件(CA文件)
+				
+		命令：
+		步骤一:openssl genrsa -idea -out jesonc.key 1024      生产文件jesonc.key
+		步骤二:openssl req -new -key jesonc.key -out jesonc.csr
+		步骤三:openssl x509 -req -days 3650 -in jesonc.csr -signkey jesonc.key -out jesonc.crt
+	
+	Nginx 的HTTPS语法配置
+		Syntax:ssl on|off;
+		Default:ssl off;
+		Context:http,server
+		
+		Syntax:ssl_certificate file;
+		Default:-
+		Context:http,server
+		
+		Syntax:ssl_certificate_key file;
+		Default:-
+		Context:http,server
+		
+		
+	场景 - 配置苹果要求的证书
+		a、服务器所有的连接使用TLS1.2以上版本(openssl 1.0.2)
+		b、HTTPS证书必须使用SHA256以上哈希算法签名
+		c、HTTPS证书必须使用RSA 2048位或ECC 256位以上公钥算法
+		d、使用前向加密技术
+		
+		
+		查看证书命令:openssl x509 -noout -text -in ./jesonc.crt  
+		
+		服务器端的key里面的key剥离掉:openssl rsa -in server.key -out server.key.unsecure
+	
+	HTTPS服务优化
+		方法一、激活keepalive长连接
+		方法二、设置ssl session缓存
+		
+五、Nginx 与 Lua开发
+		Lua及基础语法
+		Nginx与Lua环境
+		场景:用Nginx结合Lua实现代码的灰度发布
+		
+		Nginx+Lua优势
+					充分的结合Nginx的并发处理epoll优势和Lua的轻量实现简单的功能切高并发的场景
+					
+		安装Lua
+		yum install lua
+		
+		#lua 或是以.lua结束的脚本
+		注释：
+		--行注释
+		--[[
+		块注释
+		--]]
+		
+		变量：
+		a='alo\n123"'
+		a="alo\n123\""
+		a='\97lo\10\04923"'
+		a=[[alo
+		123"]]
+		
+		布尔类型只用nil和false是false，数字0，" 空字符串('\0')都是true
+		
+		while 循环语法
+		比如：
+		
+		sum=0
+		num=1
+		while num<100 do
+			sum =sum +num
+			num = num+1
+		end
+		print("sum=",sum)
+		Lua没有++或是+=这样的操作
+		
+		
+		for循环语句
+			sun =0
+			for i=1,100 do
+				sum =sum+i
+			end
+			
+			
+		if - else 判断语句
+		
+			if age==40 and sex =="Male" then
+				print("大于40男人")
+			elseif age >60 and sex~="Female" then
+				print("非女人而且大于60")
+			else
+				local age =io.read()
+				print("Your age is"..age)
+			end
+			
+			
+		"~="是不等于
+		字符串的拼接操作符".."
+		io库的分别从stdin和stdout读写的read和write函数
+		
+		环境信息
+		1.LuaJIT
+		2.ngx_devel_kit和lua-nginx-module
+		3.重新编译nginx
+		
+		参考:www.imooc.com/article/19597
+		
+		
+Nginx调用lua模块指令
+			Nginx的可插拔模块化加载执行，共11个处理阶段
+			set_by_lua					设置nginx变量，可以实现复杂的赋值逻辑
+			set_by_lua_file				
+		
+			access_by_lua				请求访问阶段处理，用于访问控制
+			access_by_lua_file
+			
+			content_by_lua				内容处理器，接收请求处理并输出响应
+			content_by_lua_file 
+			
+		Nginx Lua API
+			ngx.var					nginx变量
+			ngx.req.get_headers		获取请求头
+			ngx.req.get_uri_args	获取url请求参数
+			ngx.redirect			重定向
+			ngx.print				输出响应内容体
+			ngx.say					通ngx.print，但是会最后输出一个换行符
+			ngx.header				输出响应头
+			...
+			
+实战场景 - 灰度发布
+		按照一定的关系区别，分部分代码进行上线，使代码的分布能平滑过渡上线。
+		 
+		 
+框架篇
+	一、Nginx常见问题
+		1.相同server_name多个虚拟主机优先级访问
+		2.location匹配优先级
+		3.try_files使用
+		4.Nginx的alias和root区别
+		5.用什么方法传递用户的真实IP
+		
+		location 匹配优先级
+			=		进行普通字符精确匹配，也就是完全匹配
+			^~		表示普通字符匹配，使用前缀匹配
+			~\~*	表示执行一个正则匹配()
+		Nginx的try_files的使用
+			按顺序检查文件是否存在
+			
+		Nginx的alias和root区别
+			location/request_path/image/{
+				root/local_path/image/;
+				}
+				
+			location /request_path/image/{
+				alias/local_path/image/;
+				}
+				
+		用什么样的方法传递用户的真实IP地址
+		
+			约定在第一个代理  set x_real_ip=$remote_addr              后端服务:$x_real_ip=IP1(真实地址)
+		Nginx状态码返回
+			413 request Entity too large
+				1、用户上传文件限制client_max_boby_size
+			502 bad gateway
+				1、后端服务无响应
+			504 Gateway Time-out(默认时间是60秒)
+				1、后端服务执行超时
+	Nginx性能优化
+		1、性能优化考虑点
+				a、当前系统结构瓶颈
+					观察指标、压力测试
+				b、了解业务模式
+					接口业务类型、系统层次化结构
+				c、性能与安全
+		2、压测工具ab
+			a、安装
+				yum	install	httpd-tools
+			b、使用
+				ab -n 2000 -c url
+				-n 总的请求数
+				-c并发数
+				-k是否开启长连接
+		3、系统与nginx性能优化
+			a、网络
+			b、系统
+			c、服务本身
+			d、程序
+			e、数据库、底层服务
+			
+			文件句柄
+				Linux\UNix一切皆文件，文件句柄就是一个索引
+				设置方式
+					系统全局性修改、用户局部性修改、进程局部性修改
+						vim /etc/security/limits.conf
+							root(用户) soft nofile 6666(文件数)
+							root(用户) hard nofile 7778(文件数)			*表示所有用户
+							
+			CPU的亲和
+				把进程通常不会在处理器之间频繁迁移进程的频率小，减少性能损耗。(cat /proc/cpuinfo |grep "physical id"|sort|uniq|wc -l)
+	
+
+				GRPC
+	gRPC是由Google主导开发的RPC框架
+	gRPC提供的从客户端到服务器的整套解决方案
+	gRPC是一个基于HTTP2.0的协议
+		一、简单模式
+			客户端发起一次请求，服务端响应一个数据
+			
+		二、双向数据流模式
+			客户端和服务端都可以向对方发送数据流，
+			这个时候双方的数据可以同时相互发送
+					Nginx反向代理GRPC
+		步骤一、升级Nginx
+				nginx1.13.10支持GRPC
+		步骤二、部署go语言环境
+		步骤三、测试用例
+		步骤四、配置Nginx配置文件
+		
+		
+		go语言下载
+		getconf LONG_BIT	
+		wget https://www.golangtc.com/static/go/1.9.2/go1.9.2.linux-amd64.tar.gz
+		
+		git clone https://github.com/grpc/grpc-go.git
+
+	
+	
+	server/server.go:43:2: cannot find package "google.golang.org/grpc/testdata" in any of:
+	/usr/local/go/src/google.golang.org/grpc/testdata (from $GOROOT)
+	/root/go/src/google.golang.org/grpc/testdata (from $GOPATH)
+
+	
+	
+	
+	####### add protobuf lib path ########
+#(动态库搜索路径) 程序加载运行期间查找动态链接库时指定除了系统默认路径之外的其他路径
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/protobuf/lib/
+#(静态库搜索路径) 程序编译期间查找动态链接库时指定查找共享库的路径
+export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/go/src/github.com/golang/protobuf/lib/
+#执行程序搜索路径
+export PATH=$PATH:/usr/local/go/src/github.com/golang/protobuf/bin/
+#c程序头文件搜索路径
+export C_INCLUDE_PATH=$C_INCLUDE_PATH:/usr/local/go/src/github.com/golang/protobuf/include/
+#c++程序头文件搜索路径
+export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:/usr/local/go/src/github.com/golang/protobuf/include/
+#pkg-config 路径
+export PKG_CONFIG_PATH=/usr/local/go/src/github.com/golang/protobuf/lib/pkgconfig/
+
+	
+	
+
+		
